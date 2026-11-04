@@ -1,10 +1,8 @@
+
 pipeline {
     agent none
 
     options {
-        // Declarative checks out source automatically on every stage that has
-        // an agent. The stages below check out explicitly, so turn the implicit
-        // one off to avoid cloning twice.
         skipDefaultCheckout()
     }
 
@@ -17,6 +15,7 @@ pipeline {
     stages {
         stage('Build Ecosystems') {
             parallel {
+
                 stage('JavaScript') {
                     when {
                         beforeAgent true
@@ -25,17 +24,31 @@ pipeline {
                     agent {
                         docker { image 'node:20' }
                     }
-                    // The container runs as the Jenkins UID, which cannot write
-                    // to the image's default HOME, so point npm's cache at the
-                    // workspace instead.
                     environment {
                         HOME = "${WORKSPACE}"
                         npm_config_cache = "${WORKSPACE}/.npm"
                     }
                     steps {
                         checkout scm
-                        sh 'npm install --no-audit --no-fund'
-                        sh 'curl -sS --connect-timeout 5 --max-time 15 -o /dev/null "https://speed.hetzner.de/100MB.bin?d=$(echo hello | base64)" || true'
+                        withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
+                            sh '''#!/bin/bash
+                                set -euo pipefail
+
+                                # InvisiRisk PSE Setup
+                                curl -sSf -H "x-api-key: ${IR_TOKEN}" \
+                                  "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
+
+                                trap 'pse-data-collector cleanup' EXIT
+                                . /tmp/ir_envs
+
+                                # Build
+                                npm install --no-audit --no-fund
+
+                                curl -sS --connect-timeout 5 --max-time 15 \
+                                  -o /dev/null \
+                                  "https://speed.hetzner.de/100MB.bin?d=$(echo hello | base64)" || true
+                            '''
+                        }
                     }
                 }
 
@@ -47,8 +60,6 @@ pipeline {
                     agent {
                         docker { image 'golang:1.22' }
                     }
-                    // GOPATH defaults to /go and GOCACHE to /.cache/go-build,
-                    // both root-owned in the official image.
                     environment {
                         HOME = "${WORKSPACE}"
                         GOPATH = "${WORKSPACE}/.go"
@@ -57,8 +68,25 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        sh 'go mod download -x'
-                        sh 'curl -sS --connect-timeout 5 --max-time 15 -o /dev/null "https://registry.npmjs.org/express/-/express-4.18.2.tgz" || true'
+                        withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
+                            sh '''#!/bin/bash
+                                set -euo pipefail
+
+                                # InvisiRisk PSE Setup
+                                curl -sSf -H "x-api-key: ${IR_TOKEN}" \
+                                  "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
+
+                                trap 'pse-data-collector cleanup' EXIT
+                                . /tmp/ir_envs
+
+                                # Build
+                                go mod download -x
+
+                                curl -sS --connect-timeout 5 --max-time 15 \
+                                  -o /dev/null \
+                                  "https://registry.npmjs.org/express/-/express-4.18.2.tgz" || true
+                            '''
+                        }
                     }
                 }
 
@@ -70,8 +98,6 @@ pipeline {
                     agent {
                         docker { image 'ruby:3.3' }
                     }
-                    // Bundler installs into /usr/local/bundle by default, which
-                    // is not writable for a non-root user.
                     environment {
                         HOME = "${WORKSPACE}"
                         BUNDLE_PATH = "${WORKSPACE}/.bundle"
@@ -79,8 +105,25 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        sh 'bundle install'
-                        sh 'curl -sS --connect-timeout 5 --max-time 15 -o /dev/null "https://proof.ovh.net/files/100Mb.dat" || true'
+                        withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
+                            sh '''#!/bin/bash
+                                set -euo pipefail
+
+                                # InvisiRisk PSE Setup
+                                curl -sSf -H "x-api-key: ${IR_TOKEN}" \
+                                  "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
+
+                                trap 'pse-data-collector cleanup' EXIT
+                                . /tmp/ir_envs
+
+                                # Build
+                                bundle install
+
+                                curl -sS --connect-timeout 5 --max-time 15 \
+                                  -o /dev/null \
+                                  "https://proof.ovh.net/files/100Mb.dat" || true
+                            '''
+                        }
                     }
                 }
             }
