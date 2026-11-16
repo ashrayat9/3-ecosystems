@@ -22,7 +22,15 @@ pipeline {
                         expression { !params.SKIP_JAVASCRIPT }
                     }
                     agent {
-                        docker { image 'node:20' }
+                        docker {
+                            // -u root: the PSE bootstrap writes a CA cert into the
+                            //   system trust store and pse-data-collector into
+                            //   /usr/local/bin, neither writable by the Jenkins user.
+                            // --cap-add=NET_ADMIN: native mode redirects egress
+                            //   with iptables.
+                            image 'node:20'
+                            args  '-u root --cap-add=NET_ADMIN'
+                        }
                     }
                     environment {
                         HOME = "${WORKSPACE}"
@@ -70,7 +78,10 @@ pipeline {
                         expression { !params.SKIP_GO }
                     }
                     agent {
-                        docker { image 'golang:1.22' }
+                        docker {
+                            image 'golang:1.22'
+                            args  '-u root --cap-add=NET_ADMIN'
+                        }
                     }
                     environment {
                         HOME = "${WORKSPACE}"
@@ -120,7 +131,10 @@ pipeline {
                         expression { !params.SKIP_RUBY }
                     }
                     agent {
-                        docker { image 'ruby:3.3' }
+                        docker {
+                            image 'ruby:3.3'
+                            args  '-u root --cap-add=NET_ADMIN'
+                        }
                     }
                     environment {
                         HOME = "${WORKSPACE}"
