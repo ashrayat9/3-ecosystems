@@ -1,0 +1,100 @@
+// Alternative pipeline that does NOT need the Docker Pipeline plugin.
+//
+// Instead of `agent { docker { ... } }`, it runs `docker run` through `sh`.
+// The only requirements are a Docker CLI on the agent and the jenkins user
+// having access to the Docker socket.
+//
+// To use this, point the job's "Script Path" at Jenkinsfile.docker-cli,
+// or rename it over Jenkinsfile.
+
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(name: 'SKIP_JAVASCRIPT', defaultValue: false, description: 'Skip JavaScript')
+        booleanParam(name: 'SKIP_GO', defaultValue: false, description: 'Skip Go')
+        booleanParam(name: 'SKIP_RUBY', defaultValue: false, description: 'Skip Ruby')
+    }
+
+    stages {
+        stage('Check Docker') {
+            steps {
+                sh 'docker version && docker info --format "storage={{.Driver}} containers={{.Containers}}"'
+            }
+        }
+
+        stage('JavaScript') {
+            when {
+                expression { !params.SKIP_JAVASCRIPT }
+            }
+            steps {
+                // -u keeps files in the workspace owned by the Jenkins user, so
+                // the next build can still clean the workspace.
+                // HOME and the cache vars are redirected because the image's
+                // defaults are root-owned.
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+docker run --rm \
+  -v "${WORKSPACE}":/w -w /w \
+  -u "$(id -u):$(id -g)" \
+  -e HOME=/w \
+  -e npm_config_cache=/w/.npm \
+  node:20 npm install --no-audit --no-fund
+'''
+                sh '''#!/usr/bin/env bash
+set -uo pipefail
+docker run --rm node:20 curl -sS --connect-timeout 5 --max-time 15 -o /dev/null "https://speed.hetzner.de/100MB.bin?d=$(echo hello | base64)" || true
+'''
+            }
+        }
+
+        stage('Go') {
+            when {
+                expression { !params.SKIP_GO }
+            }
+            steps {
+                // GOPATH defaults to /go and GOCACHE to /.cache/go-build, both
+                // root-owned. -modcacherw keeps the module cache deletable.
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+docker run --rm \
+  -v "${WORKSPACE}":/w -w /w \
+  -u "$(id -u):$(id -g)" \
+  -e HOME=/w \
+  -e GOPATH=/w/.go \
+  -e GOCACHE=/w/.cache/go-build \
+  -e GOFLAGS=-modcacherw \
+  golang:1.22 go mod download -x
+'''
+                sh '''#!/usr/bin/env bash
+set -uo pipefail
+docker run --rm golang:1.22 curl -sS --connect-timeout 5 --max-time 15 -o /dev/null "https://registry.npmjs.org/express/-/express-4.18.2.tgz" || true
+'''
+            }
+        }
+
+        stage('Ruby') {
+            when {
+                expression { !params.SKIP_RUBY }
+            }
+            steps {
+                // Bundler's default /usr/local/bundle is not writable for a
+                // non-root user.
+                sh '''#!/usr/bin/env bash
+set -euo pipefail
+docker run --rm \
+  -v "${WORKSPACE}":/w -w /w \
+  -u "$(id -u):$(id -g)" \
+  -e HOME=/w \
+  -e BUNDLE_PATH=/w/.bundle \
+  -e GEM_HOME=/w/.gem \
+  ruby:3.3 bundle install
+'''
+                sh '''#!/usr/bin/env bash
+set -uo pipefail
+docker run --rm ruby:3.3 curl -sS --connect-timeout 5 --max-time 15 -o /dev/null "https://proof.ovh.net/files/100Mb.dat" || true
+'''
+            }
+        }
+    }
+}

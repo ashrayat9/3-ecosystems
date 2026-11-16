@@ -1,0 +1,20 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      ################## InvisiRisk PSE Setup (staging only) ##############
+      - | 
+          curl -sSf -H "x-api-key: ${IR_TOKEN}" "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
+          . /tmp/ir_envs
+      ################## Loging to ECR and Increse EC2 count ###################################
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+  build:
+    commands:
+      ################## Docker Build and Push ##############################
+      
+      - docker build --build-arg BUILDKIT_SYNTAX=public.ecr.aws/w3c0c0n7/invisirisk/baf-buildkit:latest --secret id=pse-ca,src=/etc/pki/ca-trust/source/anchors/pse.crt --build-arg PSE_PROXY=http://${PSE_PROXY_IP}:3128 -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$Producer_IMAGE_REPO_NAME:$IMAGE_TAG . --push
+    finally:
+      - ################# InvisiRisk PSE Cleanup (staging only) #############
+      - pse-data-collector cleanup

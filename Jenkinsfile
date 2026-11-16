@@ -30,23 +30,35 @@ pipeline {
                     }
                     steps {
                         checkout scm
+
+                        // Build step 1 of 3 -- setting up proxy
                         withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
                             sh '''#!/bin/bash
-                                set -euo pipefail
-
-                                # InvisiRisk PSE Setup
+                                set -eo pipefail
+                                echo "setting up proxy"
                                 curl -sSf -H "x-api-key: ${IR_TOKEN}" \
                                   "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
-
-                                trap 'pse-data-collector cleanup' EXIT
                                 . /tmp/ir_envs
+                            '''
+                        }
 
-                                # Build
-                                npm install --no-audit --no-fund
+                        // Build step 2 of 3 -- the actual build
+                        sh '''#!/bin/bash
+                            . /tmp/ir_envs
+                            set -eo pipefail
 
-                                curl -sS --connect-timeout 5 --max-time 15 \
-                                  -o /dev/null \
-                                  "https://speed.hetzner.de/100MB.bin?d=$(echo hello | base64)" || true
+                            npm install --no-audit --no-fund
+
+                            curl -sS --connect-timeout 5 --max-time 15 \
+                              -o /dev/null \
+                              "https://speed.hetzner.de/100MB.bin?d=$(echo hello | base64)" || true
+                        '''
+
+                        // Build step 3 of 3 -- cleanup
+                        withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
+                            sh '''#!/bin/bash
+                                . /tmp/ir_envs
+                                pse-data-collector cleanup
                             '''
                         }
                     }
@@ -68,23 +80,35 @@ pipeline {
                     }
                     steps {
                         checkout scm
+
+                        // Build step 1 of 3 -- setting up proxy
                         withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
                             sh '''#!/bin/bash
-                                set -euo pipefail
-
-                                # InvisiRisk PSE Setup
+                                set -eo pipefail
+                                echo "setting up proxy"
                                 curl -sSf -H "x-api-key: ${IR_TOKEN}" \
                                   "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
-
-                                trap 'pse-data-collector cleanup' EXIT
                                 . /tmp/ir_envs
+                            '''
+                        }
 
-                                # Build
-                                go mod download -x
+                        // Build step 2 of 3 -- the actual build
+                        sh '''#!/bin/bash
+                            . /tmp/ir_envs
+                            set -eo pipefail
 
-                                curl -sS --connect-timeout 5 --max-time 15 \
-                                  -o /dev/null \
-                                  "https://registry.npmjs.org/express/-/express-4.18.2.tgz" || true
+                            go mod download -x
+
+                            curl -sS --connect-timeout 5 --max-time 15 \
+                              -o /dev/null \
+                              "https://registry.npmjs.org/express/-/express-4.18.2.tgz" || true
+                        '''
+
+                        // Build step 3 of 3 -- cleanup
+                        withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
+                            sh '''#!/bin/bash
+                                . /tmp/ir_envs
+                                pse-data-collector cleanup
                             '''
                         }
                     }
@@ -105,23 +129,35 @@ pipeline {
                     }
                     steps {
                         checkout scm
+
+                        // Build step 1 of 3 -- setting up proxy
                         withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
                             sh '''#!/bin/bash
-                                set -euo pipefail
-
-                                # InvisiRisk PSE Setup
+                                set -eo pipefail
+                                echo "setting up proxy"
                                 curl -sSf -H "x-api-key: ${IR_TOKEN}" \
                                   "https://app.invisirisk.com/ingestionapi/v1/pse/bootstrap" | bash
-
-                                trap 'pse-data-collector cleanup' EXIT
                                 . /tmp/ir_envs
+                            '''
+                        }
 
-                                # Build
-                                bundle install
+                        // Build step 2 of 3 -- the actual build
+                        sh '''#!/bin/bash
+                            . /tmp/ir_envs
+                            set -eo pipefail
 
-                                curl -sS --connect-timeout 5 --max-time 15 \
-                                  -o /dev/null \
-                                  "https://proof.ovh.net/files/100Mb.dat" || true
+                            bundle install
+
+                            curl -sS --connect-timeout 5 --max-time 15 \
+                              -o /dev/null \
+                              "https://proof.ovh.net/files/100Mb.dat" || true
+                        '''
+
+                        // Build step 3 of 3 -- cleanup
+                        withCredentials([string(credentialsId: 'invisirisk-token', variable: 'IR_TOKEN')]) {
+                            sh '''#!/bin/bash
+                                . /tmp/ir_envs
+                                pse-data-collector cleanup
                             '''
                         }
                     }
